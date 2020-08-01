@@ -75,14 +75,23 @@ def stations():
 
     """List of stations from dataset"""
     # Query all stations
-    station_name = session.query(station.id, station.name).all()
+    stations_list = session.query(station).all()
+
+    # Convert list of tuples into normal list
+    stations_list = list()
+
+    for stat in stations_list:
+            stations_dict = dict()
+            stations_dict['Station'] = station.station
+            stations_dict["Station Name"] = station.name
+            stations_dict["Latitude"] = station.latitude
+            stations_dict["Longitude"] = station.longitude
+            stations_dict["Elevation"] = station.elevation
+            stations_list.append(stations_dict)
 
     session.close()
 
-    # Convert list of tuples into normal list
-    all_stations = dict(station_name)
-
-    return jsonify(all_stations)
+    return jsonify(stations_dict)
 
 @app.route("/api/v1.0/tobs")
 def tobs():
@@ -108,7 +117,7 @@ def start(start=None):
 
     start_temps = session.query(func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).filter(measurement.date >= start).all()
     
-    session.close()
+    
 
     # Convert list of tuples into normal list
     start_list = list()
@@ -118,8 +127,10 @@ def start(start=None):
         start_dict["Max Temp"] = tavg
         start_dict["Avg Temp"] = tmax
         start_list.append(start_dict)
+    
+    session.close()
 
-    return jsonify ({'Data':start_list})
+    return jsonify (start_list)
 
 @app.route("/api/v1.0/period/<start>/<end>")
 def period(start,end):
