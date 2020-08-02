@@ -4,14 +4,13 @@ import sqlalchemy
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, func
-import datetime as dt
+from datetime import datetime as dt
 from flask import Flask, jsonify
-
 
 #################################################
 # Database Setup
 #################################################
-engine = create_engine("sqlite:///Resources/hawaii.sqlite")
+engine = create_engine("sqlite:///Resources/hawaii.sqlite",connect_args={'check_same_thread':False})
 
 # reflect an existing database into a new model
 Base = automap_base()
@@ -20,19 +19,16 @@ Base.prepare(engine, reflect=True)
 
 # Save references to the table
 measurement = Base.classes.measurement
-station = Base.classes.station
+Station = Base.classes.station
 
 # Identification of last date of data
 session = Session(engine)
 last_date = session.query(measurement.date).order_by(measurement.date.desc()).first()
 
-# Identification of first date for last 12 months
-last_year = dt.date(2017,8,23) - dt.timedelta(days=365)
 #################################################
 # Flask Setup
 #################################################
 app = Flask(__name__)
-
 
 #################################################
 # Flask Routes
@@ -46,8 +42,8 @@ def welcome():
         f"1. Precipitation for last 12 months - /api/v1.0/precipitation<br/><br/>"
         f"2. List of stations - /api/v1.0/stations<br/><br/>"
         f"3. Temperature Observations Data for the most active station for the last 12 months - /api/v1.0/tobs<br/><br/>"
-        f"4. Temperature data from your chosen start date. Please insert the start date as 'YYYY-MM-DD' - /api/v1.0/start/<start><br/><br/>"
-        f"5. Temperature data for a specified period. Please insert the start and dates as 'YYYY-MM-DD'/'YYYY-MM-DD' - /api/v1.0/period/<start>/<end><br/><br/>"
+        f"4. Temperature data from your chosen start date. Please insert the start date as 'YYYY-MM-DD' - /api/v1.0/<start><br/><br/>"
+        f"5. Temperature data for a specified period. Please insert the start and dates as 'YYYY-MM-DD, YYYY-MM-DD' - /api/v1.0/<start>/<end><br/><br/>"
     )
 
 @app.route("/api/v1.0/precipitation")
@@ -70,28 +66,21 @@ def precipitation():
 
 @app.route("/api/v1.0/stations")
 def stations():
+
 # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """List of stations from dataset"""
-    # Query all stations
-    stations_list = session.query(station).all()
+    """Return all stations"""
+    # Query data for all stations
 
-    # Convert list of tuples into normal list
-    stations_list = list()
-
-    for stat in stations_list:
-            stations_dict = dict()
-            stations_dict['Station'] = station.station
-            stations_dict["Station Name"] = station.name
-            stations_dict["Latitude"] = station.latitude
-            stations_dict["Longitude"] = station.longitude
-            stations_dict["Elevation"] = station.elevation
-            stations_list.append(stations_dict)
+    all_stations = session.query(Station.station, Station.name).all()
 
     session.close()
 
-    return jsonify(stations_dict)
+    # Convert list of tuples into normal list
+    station_list = list(np.ravel(all_stations))
+
+    return jsonify(station_list)
 
 @app.route("/api/v1.0/tobs")
 def tobs():
@@ -110,42 +99,37 @@ def tobs():
 
     return jsonify(tobs_data)
 
-@app.route("/api/v1.0/start/<start>")
-def start(start=None):
-# Create our session (link) from Python to the DB
-    session = Session(engine)
+@app.route("/api/v1.0/<start_date>")
+def start_stats(start_date):
 
-    start_temps = session.query(func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).filter(measurement.date >= start).all()
-    
-    
+	start_temps = session.query(
+		func.min(measurement.tobs), 
+		func.avg(measurement.tobs),
+		func.max(measurement.tobs)
+	).filter(
+		measurement.date >= start_date
+	).all()
 
-    # Convert list of tuples into normal list
-    start_list = list()
-    for tmin, tavg, tmax in start_temps:
-        start_dict = {}
-        start_dict["Min Temp"] = tmin
-        start_dict["Max Temp"] = tavg
-        start_dict["Avg Temp"] = tmax
-        start_list.append(start_dict)
-    
-    session.close()
 
-    return jsonify (start_list)
+	temp_stats = list()
+	for tmin, tavg, tmax in start_temps:
+		temp_stats_dict = {}
+		temp_stats_dict["Min Temp"] = tmin
+		temp_stats_dict["Max Temp"] = tavg
+		temp_stats_dict["Avg Temp"] = tmax
+		temp_stats.append(temp_stats_dict)
 
-@app.route("/api/v1.0/period/<start>/<end>")
-def period(start,end):
-# Create our session (link) from Python to the DB
-    session = Session(engine)
+	return jsonify (temp_stats)
 
-    period_temps = session.query(func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).filter(measurement.date >= start, measurement.date <= end).all()
+@app.route("/api/v1.0/<start>/<end>")
+def tstartend(start,end):         
+    """ When given the start and the end date, calculate the `TMIN`, `TAVG`, and `TMAX` for dates between the start and end date inclusive. """    
+    results = session.query(func.min(measurement.tobs), func.avg(measurement.tobs),func.max(measurement.tobs)).\
+                  filter(measurement.date >= start, measurement.date <= end).order_by(measurement.date.desc()).all()
+    print(f"Temperature Analysis for the dates greater than or equal to the start date and lesser than or equal to the end date")
+    for temps in results:
+        dict = {"Minimum Temp":results[0][0],"Average Temp":results[0][1],"Maximum Temp":results[0][2]}
+    return jsonify(dict)   
 
-    session.close()
-
-    # Convert list of tuples into normal list
-    for temps in period_temps:
-        period_temp_dict = {"Minimum Temp":period_temps[0][0],"Average Temp":period_temps[0][1],"Maximum Temp":period_temps[0][2]}
-
-    return jsonify (period_temp_dict)
-
-if __name__ == "__main__":
-    app.run(debug=False)
+if __name__ == '__main__':
+    app.run(debug=True)
