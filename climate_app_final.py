@@ -102,24 +102,21 @@ def tobs():
 @app.route("/api/v1.0/<start_date>")
 def start_stats(start_date):
 
-	start_temps = session.query(
-		func.min(measurement.tobs), 
-		func.avg(measurement.tobs),
-		func.max(measurement.tobs)
-	).filter(
-		measurement.date >= start_date
-	).all()
+    start_temps = session.query(
+        func.min(measurement.tobs), 
+        func.avg(measurement.tobs),
+        func.max(measurement.tobs)).filter(measurement.date >= start_date).all()
 
 
-	temp_stats = list()
-	for tmin, tavg, tmax in start_temps:
-		temp_stats_dict = {}
-		temp_stats_dict["Min Temp"] = tmin
-		temp_stats_dict["Max Temp"] = tavg
-		temp_stats_dict["Avg Temp"] = tmax
-		temp_stats.append(temp_stats_dict)
+    temp_stats = list()
+    for tmin, tavg, tmax in start_temps:
+        temp_stats_dict = {}
+        temp_stats_dict["Min Temp"] = tmin
+        temp_stats_dict["Avg Temp"] = tavg
+        temp_stats_dict["Max Temp"] = tmax
+        temp_stats.append(temp_stats_dict)
 
-	return jsonify (temp_stats)
+        return jsonify (temp_stats)
 
 @app.route("/api/v1.0/<start>/<end>")
 def tstartend(start,end):         
